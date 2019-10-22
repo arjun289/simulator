@@ -9,12 +9,14 @@ defmodule DroneSimulator.Control.Dispatcher do
   """
 
   use GenStage
-  alias DroneSimulator.DroneDataAgent
+  alias DroneSimulator.Drone
 
+  @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(drone_ids) do
     GenStage.start_link(__MODULE__, drone_ids, name: __MODULE__)
   end
 
+  @spec event_dispatch(any) :: :ok
   def event_dispatch(event) do
     GenStage.cast(__MODULE__, {:notify, event})
   end
@@ -65,7 +67,7 @@ defmodule DroneSimulator.Control.Dispatcher do
 
   defp get_events(time_event, events, drone_agents) do
     Enum.reduce(drone_agents, events, fn agent, acc ->
-      data = DroneDataAgent.pop_events(agent, time_event)
+      data = Drone.DataAgent.pop_events(agent, time_event)
       acc ++ data
     end)
   end
