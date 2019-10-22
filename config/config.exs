@@ -18,4 +18,4 @@ config :drone_simulator,
 config :drone_simulator,
   timer_start_date_time: "2011-03-22 07:55:26",
   timer_end_date_time: "2011-03-22 08:10:00",
-  ticking_cycle: 10_000
+  ticking_cycle: 30_000
