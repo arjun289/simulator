@@ -3,7 +3,8 @@ defmodule DroneSimulator.Application do
 
   def start(_type, _args)do
     children = [
-      DroneSimulator.DroneDataSupervisor
+      DroneSimulator.DroneDataSupervisor,
+      DroneSimulator.Tube.DataAgent
     ]
     opts = [strategy: :one_for_one, name: DroneSimulator.Supervisor]
 

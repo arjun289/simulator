@@ -7,7 +7,7 @@ defmodule DroneSimulator.DroneDataSupervisor do
   """
 
   use Supervisor
-  alias DroneSimulator.DroneDataAgent
+  alias DroneSimulator.Drone.DataAgent
 
   def start_link(_) do
     drone_id_list = Application.get_env(:drone_simulator, :drone_ids)
@@ -16,7 +16,7 @@ defmodule DroneSimulator.DroneDataSupervisor do
 
   def init(drone_id_list) do
     children = Enum.map(drone_id_list, fn drone_id ->
-      Supervisor.child_spec({DroneDataAgent, drone_id}, id: drone_id)
+      Supervisor.child_spec({DataAgent, drone_id}, id: drone_id)
     end)
 
     options = [strategy: :one_for_one]
