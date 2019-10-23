@@ -1,105 +1,119 @@
 defmodule DroneSimulator.Tube.Quadtree do
+  @moduledoc """
+  The module defines a quad tree structure to specify all the co-ordinates
+  for tube stations and allows performing search for nearest neighbor of
+  any given co-oridnate.
 
-  alias __MODULE__, as: Quadtree
+  ### Note!
+  For simplicity and domain handling only one point per node is allowed at present.
+  """
 
   defstruct(
     point: nil,
-    data: [],
-    nw: nil,
+    data: %{},
+    minLng: nil,
+    minLat: nil,
+    maxLng: nil,
+    maxLat: nil,
     ne: nil,
-    sw: nil,
-    se: nil
+    nw: nil,
+    se: nil,
+    sw: nil
   )
+
+  @typedoc """
+  point: holds the {lat, lng} for the point in this node.
+  data: keeps additional metadata about the point.
+  minLng: holds the left corner longitude, which is minLng for the
+    bounding box.
+  minLat: holds the left corner latitude, which is minLat for the
+    bounding box.
+  maxLng: holds the right corner longitude, which is maxLng for the
+    bounding box.
+  maxLat: holds the right corner latitiude, which is maxLat for the
+    bounding box.
+  """
 
   @type t :: %__MODULE__{}
 
+  # bounding co-ordinates for london tube stations quad tree
+  @root_coordinates %{minLng: -0.94, minLat: 51.341012, maxLng: 0.381789, maxLat: 51.846062}
 
-  @doc """
-  Returns an empty `Qudadtree` struct.
-  """
   def new() do
-    %Quadtree{}
-  end
-
-  @doc """
-  Inserts the co-ordintaes {lat. lng} in the supplied `quadtree` struct.
-  """
-  @spec insert(__MODULE__.t(), tuple, list) :: __MODULE__.t()
-  def insert(quadtree, {_lat,_lng} = child, data) do
-    if quadtree.point == nil do
-      %Quadtree{
-        point: child,
-        data: data
+    new(
+      {
+        @root_coordinates.minLng,
+        @root_coordinates.minLat,
+        @root_coordinates.maxLng,
+        @root_coordinates.maxLat
       }
-    else
-      point = quadtree.point
-      quadrant = get_quadrant(point, child)
-      if Map.get(quadtree, quadrant) == nil do
-        Map.put(quadtree, quadrant, %Quadtree{point: child, data: data})
-      else
-        Map.put(quadtree, quadrant, insert(Map.get(quadtree, quadrant),
-          child, data))
-      end
-    end
+    )
   end
 
-  @doc """
-  Returns the bounding block for the given {lat, lng} point.
-  """
-  def get_bounding_block(quadtree, {_lat, _lng} = point) do
-    acc = []
-    find_bounding_points(quadtree, point, acc)
+  def new(_bounding_coordinates = {minLng, minLat, maxLng, maxLat}) do
+    %__MODULE__{
+      minLng: minLng,
+      minLat: minLat,
+      maxLng: maxLng,
+      maxLat: maxLat
+    }
   end
 
-  ################# private functions ##########################
-
-  defp find_bounding_points(quadtree, point, acc) do
-    cond do
-      quadtree.ne != nil and check_if_contains?(quadtree, quadtree.ne, point) ->
-        acc = [quadtree.point, quadtree.ne.point]
-        find_bounding_points(quadtree.ne, point, acc)
-
-      quadtree.nw != nil and check_if_contains?(quadtree, quadtree.nw, point) ->
-        acc = [quadtree.point, quadtree.nw.point]
-        find_bounding_points(quadtree.nw, point, acc)
-
-      quadtree.sw != nil and check_if_contains?(quadtree, quadtree.sw, point) ->
-        acc = [quadtree.point, quadtree.sw.point]
-        find_bounding_points(quadtree.sw, point, acc)
-
-      quadtree.se != nil and check_if_contains?(quadtree, quadtree.se, point) ->
-        acc = [quadtree.point, quadtree.se.point]
-        find_bounding_points(quadtree.se, point, acc)
-
-      true ->
-        acc
-    end
+  @spec insert(__MODULE__.t(), map) :: __MODULE__.t()
+  def insert(quadtree, point) do
+    insert_node(
+      bounding_box_contains_cooridnate?(
+        {quadtree.minLng, quadtree.minLat, quadtree.maxLng, quadtree.maxLat},
+        {point.lat, point.lng}
+      ),
+      point,
+      quadtree
+    )
   end
 
-  defp check_if_contains?(_quadtree, nil, _point), do: false
-
-  defp check_if_contains?(quadtree, child, {point_lat, point_lng}) do
-    {parent_lat, parent_lng} = quadtree.point
-    {child_lat, child_lng } = Map.get(child, :point)
-
-    case1 = point_lat >= min(parent_lat, child_lat) and
-      point_lat <= max(parent_lat, child_lat)
-    case2 = point_lng >= min(parent_lng, child_lng)
-      and point_lng <= max(parent_lng, child_lng)
-
-    case1 and case2
+  defp insert_node(false, _point, quadtree), do: quadtree
+  defp insert_node(true, point, quadtree) do
+    insert_with_subdivide(
+      if_needs_subdivide?(quadtree.point),
+      quadtree,
+      point
+    )
   end
 
-  def get_quadrant({parent_lat, parent_lng}, {child_lat, child_lng}) do
-    cond do
-      child_lat >= parent_lat and child_lng > parent_lng ->
-        :ne
-      child_lat > parent_lat and child_lng <= parent_lng ->
-        :nw
-      child_lat <= parent_lat and child_lng < parent_lng ->
-        :sw
-      child_lat < parent_lat and child_lng >= parent_lng ->
-        :se
-    end
+  defp if_needs_subdivide?(nil), do: false
+  defp if_needs_subdivide?(_), do: true
+
+  defp insert_with_subdivide(false, quadtree, point) do
+    data = Map.put(quadtree.data, :name, point.name)
+    struct!(quadtree, point: {point.lat, point.lng}, data: data)
   end
+
+  defp insert_with_subdivide(true, quadtree, point) do
+    quadtree = subdivide_tree(quadtree)
+    require IEx
+    IEx.pry
+  end
+
+  def bounding_box_contains_cooridnate?(bounding_box, _coordinates = {lat, lng}) do
+    {minLng, minLat, maxLng, maxLat} = bounding_box
+
+    condition_1 = lng >= minLng and lng <= maxLng
+    condition_2 = lat >= minLat and lat <= maxLat
+
+    condition_1 and condition_2
+  end
+
+  def subdivide_tree(quad_tree) do
+    latMid = (quad_tree.minLat + quad_tree.maxLat) / 2
+    lngMid = (quad_tree.minLng + quad_tree.maxLng) / 2
+
+    struct!(
+      quad_tree,
+      ne: new({lngMid, latMid, quad_tree.maxLng, quad_tree.maxLat}),
+      nw: new({quad_tree.minLng, latMid, lngMid, quad_tree.maxLat}),
+      se: new({lngMid, quad_tree.minLat, quad_tree.maxLng, latMid}),
+      sw: new({quad_tree.minLng, quad_tree.minLat, latMid, lngMid})
+    )
+  end
+
 end
