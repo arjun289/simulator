@@ -49,7 +49,7 @@ defmodule DroneSimulator.Drone.DataAgent do
     |> :code.priv_dir()
     |> Path.join(path)
     |> File.stream!()
-    |> DroneDataParser.parse_stream()
+    |> DroneDataParser.parse_stream(skip_headers: false)
     |> Enum.map(&process_row_entry/1)
   end
 

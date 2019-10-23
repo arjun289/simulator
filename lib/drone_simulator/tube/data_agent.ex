@@ -14,12 +14,12 @@ defmodule DroneSimulator.Tube.DataAgent do
   end
 
   @doc """
-  Gets a value from the `bucket` by `key`.
+  Finds the nearest neighbour for the supplied point => {lat, lng}.
   """
-  def get_bounding_block(point) do
+  def get_nearest_neighbor(point) do
     Agent.get(__MODULE__, fn quadtree ->
-      Quadtree.get_bounding_block(quadtree, point)
-    end, :infinity)
+      Quadtree.nearest_neighbor(quadtree, point)
+    end)
   end
 
   ##################### private functions #############
@@ -32,17 +32,18 @@ defmodule DroneSimulator.Tube.DataAgent do
     |> :code.priv_dir()
     |> Path.join(path)
     |> File.stream!()
-    |> TubeDataParser.parse_stream()
+    |> TubeDataParser.parse_stream(skip_headers: false)
     |> Enum.map(&process_row_entry/1)
-    |> Enum.reduce(quadtree, fn [name, lat, lon], acc ->
-      Quadtree.insert(acc, {lat, lon}, [name: name])
+    |> Enum.reduce(quadtree, fn point, acc ->
+      acc = Quadtree.insert(acc, point)
+      acc
     end)
   end
 
-  defp process_row_entry([name, lat, lon]) do
+  defp process_row_entry([name, lat, lng]) do
     lat = String.to_float(lat)
-    lon = String.to_float(lon)
+    lng = String.to_float(lng)
 
-    [name, lat, lon]
+    %{name: name, lat: lat, lng: lng}
   end
 end
