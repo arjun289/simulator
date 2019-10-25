@@ -8,11 +8,20 @@ defmodule DroneSimulator.Control.Dispatcher do
   and dispatches it to drone consumer processes.
   """
 
+  @stop_time Time.from_erl!({08, 10, 00})
+
   use GenStage
   alias DroneSimulator.Drone
+  alias DroneSimulator.ControlSupervisor
+  alias DroneSimulator
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(drone_ids) do
+    IO.ANSI.color(53)
+    <> "Initializing Event Dispatcher... "
+    <> IO.ANSI.reset()
+    |> IO.puts()
+
     GenStage.start_link(__MODULE__, drone_ids, name: __MODULE__)
   end
 
@@ -36,9 +45,7 @@ defmodule DroneSimulator.Control.Dispatcher do
   end
 
   def handle_cast({:notify, time_event}, state) do
-    %{events: events, agents: drone_agents} = state
-    new_events = get_events(time_event, events, drone_agents)
-    {:noreply, events, Map.put(state, :events, new_events)}
+    handle_tick_event(stop_event_processing?(time_event), time_event, state)
   end
 
   def handle_demand(incoming_demand, state) do
@@ -47,6 +54,34 @@ defmodule DroneSimulator.Control.Dispatcher do
   end
 
   ################## private functions ####################
+
+  defp stop_event_processing?(time) do
+    time
+    |> NaiveDateTime.to_time()
+    |> Time.compare(@stop_time)
+    |> case do
+      :eq ->
+        true
+      _ ->
+        false
+    end
+  end
+
+  defp handle_tick_event(true, _time_event, _state) do
+    IO.puts(IO.ANSI.red() <> "Stopping Simulation!" <> IO.ANSI.reset())
+    Supervisor.stop(ControlSupervisor)
+    Process.sleep(2000)
+    DroneSimulator.start_simulator()
+  end
+
+  defp handle_tick_event(false, time_event, state) do
+    %{events: events, agents: drone_agents} = state
+
+    IO.inspect("Generate events for time #{inspect(time_event)}")
+    time_event = Timex.shift(time_event, minutes: 1)
+    new_events = get_events(time_event, events, drone_agents)
+    {:noreply, events, Map.put(state, :events, new_events)}
+  end
 
   defp dispatch_events(events, demand = 0, drone_agents) do
     {:noreply, [], %{events: events, demand: demand, agents: drone_agents}}
@@ -58,9 +93,6 @@ defmodule DroneSimulator.Control.Dispatcher do
 
   defp dispatch_events(events, demand, drone_agents) do
     {events_to_dispatch, remaining_events} = Enum.split(events, demand)
-    # IO.puts("events to dispatch")
-    # IO.inspect(events_to_dispatch)
-    # IO.puts("\n")
     new_state = %{events: remaining_events, demand: 0, agents: drone_agents}
     {:noreply, events_to_dispatch, new_state}
   end

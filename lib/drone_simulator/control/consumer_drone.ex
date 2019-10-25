@@ -12,6 +12,9 @@ defmodule DroneSimulator.Control.ConsumerDrone do
 
   use GenStage
   alias DroneSimulator.Control.Dispatcher
+  alias DroneSimulator.Drone.TrafficReport
+
+  @range 350
 
   @doc "Starts the consumer."
   def start_link(drone_id) do
@@ -39,7 +42,9 @@ defmodule DroneSimulator.Control.ConsumerDrone do
 
   def handle_events(events, _from, state) do
     for event <- events do
-      IO.inspect {self(), event}
+      [id, lat, lon, time] = event
+      IO.inspect("Analyse event #{inspect(event)}" )
+      TrafficReport.analyse_event(id, lat, lon, time,  @range)
     end
     {:noreply, [], state}
   end

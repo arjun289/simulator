@@ -16,6 +16,6 @@ config :drone_simulator,
 # a normal clock, the functionality here is just for simulation.
 
 config :drone_simulator,
-  timer_start_date_time: "2011-03-22 07:55:26",
-  timer_end_date_time: "2011-03-22 08:10:00",
-  ticking_cycle: 30_000
+  timer_start_date_time: "2011-03-22 07:55:00",
+  timer_end_date_time: "2011-03-22 08:15:00",
+  ticking_cycle: 10_000

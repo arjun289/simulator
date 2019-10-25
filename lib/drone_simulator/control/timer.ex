@@ -11,6 +11,11 @@ defmodule DroneSimulator.Control.Timer do
   alias DroneSimulator.Control.Dispatcher
 
   def start_link(_) do
+    IO.ANSI.color(53)
+    <> "Initializing Time Event Generator... "
+    <> IO.ANSI.reset()
+    |> IO.puts()
+
     GenServer.start_link(
       __MODULE__,
       initial_args(),
@@ -29,14 +34,12 @@ defmodule DroneSimulator.Control.Timer do
   def handle_info(:tick, state) do
     current_time = Timex.shift(state.current_time, minutes: 1)
     new_state = Map.put(state, :current_time, current_time)
-    IO.inspect(new_state.current_time)
     Dispatcher.event_dispatch(new_state.current_time)
 
     run_ticker(new_state)
 
     {:noreply, new_state}
   end
-
 
   ################### private functions ##############
 

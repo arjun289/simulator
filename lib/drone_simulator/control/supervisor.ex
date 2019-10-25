@@ -12,6 +12,11 @@ defmodule DroneSimulator.ControlSupervisor do
   alias DroneSimulator.Control.ConsumerDrone
 
   def start_link(_) do
+    IO.ANSI.color(53)
+    <> "Initializing Control Supervisor... "
+    <> IO.ANSI.reset()
+    |> IO.puts()
+
     drone_ids = Application.get_env(:drone_simulator, :drone_ids)
     Supervisor.start_link(__MODULE__, drone_ids, name: __MODULE__)
   end

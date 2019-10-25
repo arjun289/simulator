@@ -14,8 +14,10 @@ defmodule DroneSimulator.Tube.DataAgent do
   end
 
   @doc """
-  Finds the nearest neighbour for the supplied point => {lat, lng}.
+  Finds the nearest neighbour for the supplied
+    point => {lat: lat, lng: lng}.
   """
+  @spec get_nearest_neighbor(map) :: map
   def get_nearest_neighbor(point) do
     Agent.get(__MODULE__, fn quadtree ->
       Quadtree.nearest_neighbor(quadtree, point)

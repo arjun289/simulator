@@ -41,10 +41,20 @@ defmodule DroneSimulator.Tube.Quadtree do
 
   @type t :: %__MODULE__{}
 
+  @pi_over_180 3.14159265359 / 180.0
+  @radius_of_earth_meters 6_371_008.8
+
   # bounding co-ordinates for london tube stations quad tree
   @root_coordinates %{minLng: -1.1072384, minLat: 51.1987282, maxLng: 0.7302249,
     maxLat: 51.9430139}
 
+  @doc """
+  Returns a new quad tree structure.
+
+  A new quadtree structure with it's bounding box initialized as per
+  `@root_coordinates`.
+  """
+  @spec new :: DroneSimulator.Tube.Quadtree.t()
   def new() do
     new(
       {
@@ -98,7 +108,7 @@ defmodule DroneSimulator.Tube.Quadtree do
     5.If not found, then return the acc with the point, it's the nearest
       neighbour.
   """
-  @spec nearest_neighbor(__MODULE__.t(), tuple) :: map
+  @spec nearest_neighbor(__MODULE__.t(), map) :: map
   def nearest_neighbor(quadtree, point) do
     acc = %{point: nil, data: nil, best_distance: nil}
     find_nearest_neighbour(quadtree, point, acc)
@@ -107,7 +117,7 @@ defmodule DroneSimulator.Tube.Quadtree do
   ######################## private functions #################
 
   defp find_nearest_neighbour(quadtree, point, acc) do
-    acc = recurse_to_leaf(
+    recurse_to_leaf(
       is_leaf_node?(quadtree.ne),
       quadtree,
       point,
@@ -115,32 +125,135 @@ defmodule DroneSimulator.Tube.Quadtree do
     )
   end
 
-  defp recurse_to_leaf(_leaf_node = true, quadtree, point, acc) do
+  # return the acc as such if the leaf node does not have a point.
+  defp recurse_to_leaf(_has_child = nil, %__MODULE__{point: nil}, _point,
+      acc) do
+    acc
+  end
+
+  # calculate distance b/w leaf node point and supplied point
+  # and return the result as best distance uptil now.
+  defp recurse_to_leaf(_has_child = nil, quadtree, point, acc) do
     {lat, lng} = quadtree.point
+
+    distance = haversine_distance({lng, lat}, {point.lng, point.lat})
+    acc
+      |> Map.put(:point, quadtree.point)
+      |> Map.put(:best_distance, distance)
+      |> Map.put(:data, quadtree.data)
+  end
+
+  # Recurse to leaf node which contains point, calculate the distance
+  # and mark it as the best, then recurse outwards and compare the distance
+  # with parent node point and check if any siblings are near to the point.
+  # If any sibling is nearby modify the best distance in `acc`.
+  defp recurse_to_leaf(_has_child, quadtree, point, acc) do
+    quad = get_bounding_quadrant(quadtree, point)
+    tree = get_struct_data(quadtree, quad)
+
+    acc =
+      tree.ne
+      |> recurse_to_leaf(tree, point, acc)
+      |> check_distance_for_current_node(quadtree, point )
+
+    siblings = [:ne, :nw, :se, :sw] -- [quad]
+
+    Enum.reduce(siblings, acc, fn sibling, acc ->
+      tree = get_struct_data(quadtree, sibling)
+      check_distance_for_sibling_nodes(
+        acc,
+        tree.ne,
+        tree,
+        point
+      )
+    end)
+  end
+
+  # If leaf node doesn't have a point then best_distance till now is nil
+  # modify it to distance b/w current node and point.
+  defp check_distance_for_current_node(%{best_distance: nil} = acc, quadtree,
+      point) do
+    {lat, lng} = quadtree.point
+    distance = haversine_distance({lng, lat}, {point.lng, point.lat})
+
+    acc
+    |> Map.put(:point, quadtree.point)
+    |> Map.put(:best_distance, distance)
+    |> Map.put(:data, quadtree.data)
+  end
+
+  defp check_distance_for_current_node(acc, quadtree,
+      point) do
+    update_distance(quadtree, point, acc)
+  end
+
+  defp check_distance_for_sibling_nodes(acc, _has_child = nil,
+      %__MODULE__{point: nil}, _point) do
+    acc
+  end
+
+  defp check_distance_for_sibling_nodes(acc, _has_child = nil, quadtree, point) do
+    if compare_distance_with_bounding_box?(point, quadtree, acc) do
+      acc
+    else
+      update_distance(quadtree, point, acc)
+    end
+  end
+
+  defp check_distance_for_sibling_nodes(acc, _has_child, quadtree, point) do
+    if compare_distance_with_bounding_box?(point, quadtree, acc) do
+      acc
+    else
+      quadtree
+      |> update_distance(point, acc)
+      |> check_distance_for_sibling_nodes(quadtree.ne.ne, quadtree.ne, point)
+      |> check_distance_for_sibling_nodes(quadtree.nw.ne, quadtree.nw, point)
+      |> check_distance_for_sibling_nodes(quadtree.se.ne, quadtree.se, point)
+      |> check_distance_for_sibling_nodes(quadtree.sw.ne, quadtree.sw, point)
+    end
+  end
+
+  defp compare_distance_with_bounding_box?(point, quadtree, acc) do
+    point.lat < quadtree.minLat - normal_euclidean_distance(point, acc) or
+    point.lat > quadtree.maxLat + normal_euclidean_distance(point, acc) or
+    point.lng < quadtree.minLng - normal_euclidean_distance(point, acc) or
+    point.lng > quadtree.maxLat + normal_euclidean_distance(point, acc)
+  end
+
+  defp normal_euclidean_distance(point, acc) do
+    {lat, lng} = acc.point
     dx = point.lng - lng
     dy = point.lat - lat
-    distance = :math.sqrt(dx*dx + dy*dy)
-    acc
-      |> Map.put(:point, {lat, lng})
+    :math.sqrt(dx*dx + dy*dy)
+  end
+
+  defp update_distance(quadtree, point, acc) do
+    {lat, lng} = quadtree.point
+    distance = haversine_distance({lng, lat}, {point.lng, point.lat})
+
+    if distance < acc.best_distance do
+      acc
+      |> Map.put(:point, quadtree.point)
       |> Map.put(:best_distance, distance)
+      |> Map.put(:data, quadtree.data)
+    else
+      acc
+    end
   end
 
-  defp recurse_to_leaf(_leaf_node = false, quadtree, point, acc) do
-    quad = get_bounding_quadrant(quadtree, point)
-    tree = quadtree[quad]
-    acc = recurse_to_leaf(tree.ne, tree, point, acc)
+  defp haversine_distance({lon1, lat1}, {lon2, lat2}) do
+    a = :math.sin((lat2 - lat1) * @pi_over_180 / 2)
+    b = :math.sin((lon2 - lon1) * @pi_over_180 / 2)
 
-    check_with_sibling_bounding_box()
-
-  end
-
-  defp check_with_sibling_bounding_box() do
-
+    s = a * a + b * b * :math.cos(lat1 * @pi_over_180) * :math.cos(lat2 * @pi_over_180)
+    2 * :math.atan2(:math.sqrt(s), :math.sqrt(1 - s)) * @radius_of_earth_meters
   end
 
   defp get_bounding_quadrant(quadtree, point) do
     [quad] = Enum.filter([:ne, :nw, :se, :sw], fn quad ->
-      bounding_box_contains_cooridnates?(quadtree[quad], point)
+      data = get_struct_data(quadtree, quad)
+      bounding_box = {data.minLng, data.minLat, data.maxLng, data.maxLat}
+      bounding_box_contains_cooridnates?(bounding_box, {point.lat, point.lng})
     end)
     quad
   end
@@ -217,6 +330,10 @@ defmodule DroneSimulator.Tube.Quadtree do
       se: new({lngMid, quad_tree.minLat, quad_tree.maxLng, latMid}),
       sw: new({quad_tree.minLng, quad_tree.minLat, lngMid, latMid})
     )
+  end
+
+  defp get_struct_data(quadtree, key) do
+    get_in(quadtree, [Access.key(key)])
   end
 
 end
