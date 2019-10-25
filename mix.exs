@@ -31,7 +31,8 @@ defmodule DroneSimulator.MixProject do
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
       {:gen_stage, "~> 0.14"},
       {:timex, "~> 3.5"},
-      {:nimble_csv, "~> 0.6"}
+      {:nimble_csv, "~> 0.6"},
+      {:hackney, "~> 1.15.2"}
     ]
   end
 end
