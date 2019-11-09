@@ -64,7 +64,8 @@ The entire application can be sub-divided into three parts:
 
 #### Application
 
-  | - Application 
+```
+  | - Application
     |-- DroneSimulator.DroneDataSupervisor
         |-- drone_id_1
         |-- drone_id_2
@@ -72,7 +73,7 @@ The entire application can be sub-divided into three parts:
             .
         |-- drone_id_n
     |-- DroneSimulator.Tube.DataAgent
-
+```
 
 At the start of the application supervision tree starts `DroneDataSupervisor` 
 and tube data agent. 
@@ -98,14 +99,16 @@ co-oridnates.
 The control supervisor `DroneSimulator.ControlSupervisor`, starts after user 
 confirmation to start the simulator.
 
-  | -- `DroneSimulator.ControlSupervisor`
-      | -- `DroneSimulator.Control.Timer`
-      | -- `DroneSimulator.Control.Dispatcher`
-      | -- `drone_process_id_1`
+```
+  | -- DroneSimulator.ControlSupervisor
+      | -- DroneSimulator.Control.Timer
+      | -- DroneSimulator.Control.Dispatcher
+      | -- drone_process_id_1
       | -- .
            .
            .
-      | --`drone_process_id_n`
+      | --drone_process_id_n
+```
 
 Upon user confirmation the `DroneSimulator.ControlSupervisor` starts, the timer
 process, a dispatcher and multiple drone_processes depending on the drone ids 
